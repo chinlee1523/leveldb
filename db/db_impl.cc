@@ -1476,6 +1476,14 @@ Status DB::Delete(const WriteOptions& opt, const Slice& key) {
 
 DB::~DB() = default;
 
+/*
+用来打开一个DB，且此DB是线程安全的
+options 打开DB时的配置参数
+dbname 打开的DB的文件名
+dbptr 二级指针 指向打开的DB
+
+返回值Status 打开DB的结果 如果Status::ok()为值 说明打开成功 否则打开失败
+*/
 Status DB::Open(const Options& options, const std::string& dbname, DB** dbptr) {
   *dbptr = nullptr;
 
