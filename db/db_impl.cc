@@ -295,14 +295,16 @@ Status DBImpl::Recover(VersionEdit* edit, bool* save_manifest) {
   // may already exist from a previous failed creation attempt.
   env_->CreateDir(dbname_);
   assert(db_lock_ == nullptr);
+  
   Status s = env_->LockFile(LockFileName(dbname_), &db_lock_);
   if (!s.ok()) {
     return s;
   }
 
   if (!env_->FileExists(CurrentFileName(dbname_))) {
-    if (options_.create_if_missing) {
-      s = NewDB();
+    //如果CURRENT文件不存在
+    if (options_.create_if_missing) {//文件不存在则创建
+      s = NewDB();//创建DB
       if (!s.ok()) {
         return s;
       }
@@ -1494,6 +1496,7 @@ Status DB::Open(const Options& options, const std::string& dbname, DB** dbptr) {
   bool save_manifest = false;
   Status s = impl->Recover(&edit, &save_manifest);
   if (s.ok() && impl->mem_ == nullptr) {
+    //DB创建成功
     // Create new log and a corresponding memtable.
     uint64_t new_log_number = impl->versions_->NewFileNumber();
     WritableFile* lfile;
