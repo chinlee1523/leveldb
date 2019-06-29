@@ -1187,6 +1187,13 @@ void DBImpl::ReleaseSnapshot(const Snapshot* snapshot) {
 }
 
 // Convenience methods
+/* 写数据
+o为写数据时的配置
+key为写的k-v中的key
+val为写的k-v中的val
+实际上仍然是调用父类的Put函数
+最终再调用子类的Write函数
+*/
 Status DBImpl::Put(const WriteOptions& o, const Slice& key, const Slice& val) {
   return DB::Put(o, key, val);
 }
@@ -1194,27 +1201,32 @@ Status DBImpl::Put(const WriteOptions& o, const Slice& key, const Slice& val) {
 Status DBImpl::Delete(const WriteOptions& options, const Slice& key) {
   return DB::Delete(options, key);
 }
-
+//写入方法
 Status DBImpl::Write(const WriteOptions& options, WriteBatch* updates) {
   Writer w(&mutex_);
-  w.batch = updates;
-  w.sync = options.sync;
-  w.done = false;
+  w.batch = updates;//要写入的数据
+  w.sync = options.sync;//是否立刻刷到磁盘
+  w.done = false;//写入未完成
 
   MutexLock l(&mutex_);
   writers_.push_back(&w);
   while (!w.done && &w != writers_.front()) {
+    //写入未被其他线程完成且又不是队列的第1个数据，则直接等待写入成功或者变成了队列中第1个
     w.cv.Wait();
   }
   if (w.done) {
+    //如果被其他线程写入成功，则直接返回
     return w.status;
   }
 
   // May temporarily unlock and wait.
   Status status = MakeRoomForWrite(updates == nullptr);
+  //获得版本号
   uint64_t last_sequence = versions_->LastSequence();
   Writer* last_writer = &w;
   if (status.ok() && updates != nullptr) {  // nullptr batch is for compactions
+  //此时此次写入的数据在队列最前面，为了提高性能，会把队列后面的一些数据和这批数据merge后一起写入数据
+  //至少会和队列后面的多少条数据一起操作，BuildBatchGroup里面有逻辑
     WriteBatch* updates = BuildBatchGroup(&last_writer);
     WriteBatchInternal::SetSequence(updates, last_sequence + 1);
     last_sequence += WriteBatchInternal::Count(updates);
@@ -1225,11 +1237,14 @@ Status DBImpl::Write(const WriteOptions& options, WriteBatch* updates) {
     // into mem_.
     {
       mutex_.Unlock();
+      //写入log
       status = log_->AddRecord(WriteBatchInternal::Contents(updates));
       bool sync_error = false;
       if (status.ok() && options.sync) {
+        //写入log成功，且需要立即刷到磁盘
         status = logfile_->Sync();
         if (!status.ok()) {
+          //刷到磁盘失败
           sync_error = true;
         }
       }
@@ -1246,6 +1261,9 @@ Status DBImpl::Write(const WriteOptions& options, WriteBatch* updates) {
     }
     if (updates == tmp_batch_) tmp_batch_->Clear();
 
+    /*
+    设置最新的版本号
+     */
     versions_->SetLastSequence(last_sequence);
   }
 
@@ -1464,7 +1482,11 @@ void DBImpl::GetApproximateSizes(const Range* range, int n, uint64_t* sizes) {
 
 // Default implementations of convenience methods that subclasses of DB
 // can call if they wish
+/**
+ * Put操作的默认实现 如果子类不重写此方法 那么Put就走的这儿的逻辑
+ */
 Status DB::Put(const WriteOptions& opt, const Slice& key, const Slice& value) {
+  //走的批量写入的逻辑
   WriteBatch batch;
   batch.Put(key, value);
   return Write(opt, &batch);
