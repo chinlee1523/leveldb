@@ -1226,9 +1226,11 @@ Status DBImpl::Write(const WriteOptions& options, WriteBatch* updates) {
   Writer* last_writer = &w;
   if (status.ok() && updates != nullptr) {  // nullptr batch is for compactions
   //此时此次写入的数据在队列最前面，为了提高性能，会把队列后面的一些数据和这批数据merge后一起写入数据
-  //至少会和队列后面的多少条数据一起操作，BuildBatchGroup里面有逻辑
+  //至于会和队列后面的多少条数据一起操作，BuildBatchGroup里面有逻辑
     WriteBatch* updates = BuildBatchGroup(&last_writer);
+    //设置版本号
     WriteBatchInternal::SetSequence(updates, last_sequence + 1);
+    //最新的版本号为上次的版本号+这此的操作个数
     last_sequence += WriteBatchInternal::Count(updates);
 
     // Add to log and apply to memtable.  We can release the lock
@@ -1300,6 +1302,10 @@ WriteBatch* DBImpl::BuildBatchGroup(Writer** last_writer) {
   // Allow the group to grow up to a maximum size, but if the
   // original write is small, limit the growth so we do not slow
   // down the small write too much.
+  /*
+    Merge后 一次性可写入的数据（此数据为格式化后的数据大小）最大为1M
+    如果此次写入的数据大小是小于或128k，则Merge后一次性可写入数据最大为128k+此次写入数据的大小
+   */
   size_t max_size = 1 << 20;
   if (size <= (128 << 10)) {
     max_size = size + (128 << 10);
@@ -1309,13 +1315,16 @@ WriteBatch* DBImpl::BuildBatchGroup(Writer** last_writer) {
   std::deque<Writer*>::iterator iter = writers_.begin();
   ++iter;  // Advance past "first"
   for (; iter != writers_.end(); ++iter) {
+    //遍历要写入的数据队列，将符合要求的数据和当前要写入的数据merge到一起
     Writer* w = *iter;
     if (w->sync && !first->sync) {
+      //如果w中的数据要求立刻写到磁盘，但此次要写写入的数据不需要，则w中的数据不会merge到此次要写入的数据中
       // Do not include a sync write into a batch handled by a non-sync write.
       break;
     }
 
     if (w->batch != nullptr) {
+      //如此加上w中的数据后超出了一次性可写入的数据大小，则不再把w中的数据merge到此次要写入的数据中
       size += WriteBatchInternal::ByteSize(w->batch);
       if (size > max_size) {
         // Do not make batch too big
@@ -1324,11 +1333,14 @@ WriteBatch* DBImpl::BuildBatchGroup(Writer** last_writer) {
 
       // Append to *result
       if (result == first->batch) {
+        //第一次Merge
+        //Merge数据
         // Switch to temporary batch instead of disturbing caller's batch
         result = tmp_batch_;
         assert(WriteBatchInternal::Count(result) == 0);
         WriteBatchInternal::Append(result, first->batch);
       }
+      //把符合要求的数据Merge到result中
       WriteBatchInternal::Append(result, w->batch);
     }
     *last_writer = w;
