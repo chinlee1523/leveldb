@@ -73,12 +73,16 @@ Status Writer::AddRecord(const Slice& slice) {
     //判断此块record的类型
     const bool end = (left == fragment_length);
     if (begin && end) {
+      //首尾都在此record中，说明整块数据都在此record中
       type = kFullType;
     } else if (begin) {
+      //只有首在此record中
       type = kFirstType;
     } else if (end) {
+      //只有尾在此record中
       type = kLastType;
     } else {
+      //首尾都不在此record中
       type = kMiddleType;
     }
 
@@ -96,19 +100,25 @@ Status Writer::EmitPhysicalRecord(RecordType t, const char* ptr,
   assert(block_offset_ + kHeaderSize + length <= kBlockSize);
 
   // Format the header
+  //以小端的方式存储长度
   char buf[kHeaderSize];
   buf[4] = static_cast<char>(length & 0xff);
   buf[5] = static_cast<char>(length >> 8);
+  //存储record类型
   buf[6] = static_cast<char>(t);
 
   // Compute the crc of the record type and the payload.
+  //计算CRC值
   uint32_t crc = crc32c::Extend(type_crc_[t], ptr, length);
   crc = crc32c::Mask(crc);  // Adjust for storage
+  //设置CRC值
   EncodeFixed32(buf, crc);
 
   // Write the header and the payload
+  //刷入record header到record
   Status s = dest_->Append(Slice(buf, kHeaderSize));
   if (s.ok()) {
+    //刷入数据到record
     s = dest_->Append(Slice(ptr, length));
     if (s.ok()) {
       s = dest_->Flush();

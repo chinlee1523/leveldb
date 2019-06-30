@@ -1354,10 +1354,12 @@ WriteBatch* DBImpl::BuildBatchGroup(Writer** last_writer) {
 Status DBImpl::MakeRoomForWrite(bool force) {
   mutex_.AssertHeld();
   assert(!writers_.empty());
+  //是否可以延迟写入
   bool allow_delay = !force;
   Status s;
   while (true) {
     if (!bg_error_.ok()) {
+      //背景线程发生了错误
       // Yield previous error
       s = bg_error_;
       break;
@@ -1535,6 +1537,12 @@ Status DB::Open(const Options& options, const std::string& dbname, DB** dbptr) {
     // Create new log and a corresponding memtable.
     uint64_t new_log_number = impl->versions_->NewFileNumber();
     WritableFile* lfile;
+    /*
+    默认配置中 
+    env为WindowsEnv的实例指针
+    lfile，也就是logfile_为WindowsWritableFile的实例指针
+    好绕啊！！！
+     */
     s = options.env->NewWritableFile(LogFileName(dbname, new_log_number),
                                      &lfile);
     if (s.ok()) {
