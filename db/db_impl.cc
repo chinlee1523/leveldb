@@ -1189,8 +1189,8 @@ void DBImpl::ReleaseSnapshot(const Snapshot* snapshot) {
 // Convenience methods
 /* 写数据
 o为写数据时的配置
-key为写的k-v中的key
-val为写的k-v中的val
+key为写的key-value中的key
+val为写的key-value中的value
 实际上仍然是调用父类的Put函数
 最终再调用子类的Write函数
 */
@@ -1211,7 +1211,7 @@ Status DBImpl::Write(const WriteOptions& options, WriteBatch* updates) {
   MutexLock l(&mutex_);
   writers_.push_back(&w);
   while (!w.done && &w != writers_.front()) {
-    //写入未被其他线程完成且又不是队列的第1个数据，则直接等待写入成功或者变成了队列中第1个
+    //写入未被其他线程完成且又不是队列的第1个数据，则直接等待被其他线程写入成功或者变成了队列中第1个
     w.cv.Wait();
   }
   if (w.done) {
@@ -1227,6 +1227,7 @@ Status DBImpl::Write(const WriteOptions& options, WriteBatch* updates) {
   if (status.ok() && updates != nullptr) {  // nullptr batch is for compactions
   //此时此次写入的数据在队列最前面，为了提高性能，会把队列后面的一些数据和这批数据merge后一起写入数据
   //至于会和队列后面的多少条数据一起操作，BuildBatchGroup里面有逻辑
+  //所以会有上面的逻辑：此次操作的数据被其他线程写入成功了
     WriteBatch* updates = BuildBatchGroup(&last_writer);
     //设置版本号
     WriteBatchInternal::SetSequence(updates, last_sequence + 1);

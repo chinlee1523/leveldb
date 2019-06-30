@@ -31,6 +31,10 @@ Writer::Writer(WritableFile* dest, uint64_t dest_length)
 
 Writer::~Writer() = default;
 
+/**
+ * 将数据写到log中
+ * slice其实就是batch中的rep_
+ */
 Status Writer::AddRecord(const Slice& slice) {
   const char* ptr = slice.data();
   size_t left = slice.size();
@@ -44,10 +48,13 @@ Status Writer::AddRecord(const Slice& slice) {
     const int leftover = kBlockSize - block_offset_;
     assert(leftover >= 0);
     if (leftover < kHeaderSize) {
+      //当前block剩余空间不足以装下一个record的header（7个bytes)
+      //另外开辟一个新的block
       // Switch to a new block
       if (leftover > 0) {
         // Fill the trailer (literal below relies on kHeaderSize being 7)
         static_assert(kHeaderSize == 7, "");
+        //把block的剩余空间置为0
         dest_->Append(Slice("\x00\x00\x00\x00\x00\x00", leftover));
       }
       block_offset_ = 0;
@@ -56,10 +63,14 @@ Status Writer::AddRecord(const Slice& slice) {
     // Invariant: we never leave < kHeaderSize bytes in a block.
     assert(kBlockSize - block_offset_ - kHeaderSize >= 0);
 
+    //当前block剩余可用空间长度
     const size_t avail = kBlockSize - block_offset_ - kHeaderSize;
+    //实际上要使用的此块block的长度
     const size_t fragment_length = (left < avail) ? left : avail;
 
     RecordType type;
+
+    //判断此块record的类型
     const bool end = (left == fragment_length);
     if (begin && end) {
       type = kFullType;
