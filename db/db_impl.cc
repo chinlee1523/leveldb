@@ -1252,6 +1252,7 @@ Status DBImpl::Write(const WriteOptions& options, WriteBatch* updates) {
         }
       }
       if (status.ok()) {
+        //把数据写到mem_中
         status = WriteBatchInternal::InsertInto(updates, mem_);
       }
       mutex_.Lock();
@@ -1505,13 +1506,10 @@ void DBImpl::GetApproximateSizes(const Range* range, int n, uint64_t* sizes) {
 
 // Default implementations of convenience methods that subclasses of DB
 // can call if they wish
-<<<<<<< HEAD
 //实现的默认写数据的方法
-=======
 /**
  * Put操作的默认实现 如果子类不重写此方法 那么Put就走的这儿的逻辑
  */
->>>>>>> d4938fbe2eb8d379ad8971b90abcb3fbbffa1f49
 Status DB::Put(const WriteOptions& opt, const Slice& key, const Slice& value) {
   //走的批量写入的逻辑
   WriteBatch batch;
