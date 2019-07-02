@@ -1464,6 +1464,7 @@ void DBImpl::GetApproximateSizes(const Range* range, int n, uint64_t* sizes) {
 
 // Default implementations of convenience methods that subclasses of DB
 // can call if they wish
+//实现的默认写数据的方法
 Status DB::Put(const WriteOptions& opt, const Slice& key, const Slice& value) {
   WriteBatch batch;
   batch.Put(key, value);
