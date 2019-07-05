@@ -1220,6 +1220,7 @@ Status DBImpl::Write(const WriteOptions& options, WriteBatch* updates) {
   }
 
   // May temporarily unlock and wait.
+  //保证mem_有空间可以写入数据
   Status status = MakeRoomForWrite(updates == nullptr);
   //获得版本号
   uint64_t last_sequence = versions_->LastSequence();

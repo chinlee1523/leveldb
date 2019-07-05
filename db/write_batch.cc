@@ -55,12 +55,14 @@ Status WriteBatch::Iterate(Handler* handler) const {
   while (!input.empty()) {
     found++;
     char tag = input[0];
+    //移除操作类型字段（标志此操作是Put还是Delete的字段） 也就是tag
     input.remove_prefix(1);
     switch (tag) {
       case kTypeValue:
       //Put操作
         if (GetLengthPrefixedSlice(&input, &key) &&
             GetLengthPrefixedSlice(&input, &value)) {
+              //获得key和value
           handler->Put(key, value);
         } else {
           //数据异常
