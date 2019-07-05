@@ -28,6 +28,7 @@ size_t MemTable::ApproximateMemoryUsage() { return arena_.MemoryUsage(); }
 int MemTable::KeyComparator::operator()(const char* aptr,
                                         const char* bptr) const {
   // Internal keys are encoded as length-prefixed strings.
+  //取到的key 并不是单纯的key 是key+序列号+操作类型
   Slice a = GetLengthPrefixedSlice(aptr);
   Slice b = GetLengthPrefixedSlice(bptr);
   return comparator.Compare(a, b);
@@ -83,6 +84,7 @@ void MemTable::Add(SequenceNumber s, ValueType type, const Slice& key,
   size_t key_size = key.size();
   size_t val_size = value.size();
   size_t internal_key_size = key_size + 8;
+  //8个bytes 其中7个是序列号（版本号），1个是操作类型（Put或Delete)
   const size_t encoded_len = VarintLength(internal_key_size) +
                              internal_key_size + VarintLength(val_size) +
                              val_size;
