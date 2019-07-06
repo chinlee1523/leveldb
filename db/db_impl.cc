@@ -1138,8 +1138,10 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key,
     // First look in the memtable, then in the immutable memtable (if any).
     LookupKey lkey(key, snapshot);
     if (mem->Get(lkey, value, &s)) {
+      //在mem_中找到了key(肯定是最新的值)
       // Done
     } else if (imm != nullptr && imm->Get(lkey, value, &s)) {
+      //mem_中没找到，在imm_中找到了
       // Done
     } else {
       s = current->Get(options, lkey, value, &stats);

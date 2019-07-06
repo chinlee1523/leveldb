@@ -96,15 +96,17 @@ void MemTable::Add(SequenceNumber s, ValueType type, const Slice& key,
   p += 8;
   p = EncodeVarint32(p, val_size);
   memcpy(p, value.data(), val_size);
-  assert(p + val_size == buf + encoded_len);
+  assert(p + val_size == buf + encoded_le n);
   table_.Insert(buf);
 }
-
+//在mem中查找某个key
 bool MemTable::Get(const LookupKey& key, std::string* value, Status* s) {
   Slice memkey = key.memtable_key();
   Table::Iterator iter(&table_);
+  //查找key
   iter.Seek(memkey.data());
   if (iter.Valid()) {
+    //如果找到了Node（等于要找的key的Node，或者是大于此key的Node）
     // entry format is:
     //    klength  varint32
     //    userkey  char[klength]
@@ -119,6 +121,7 @@ bool MemTable::Get(const LookupKey& key, std::string* value, Status* s) {
     const char* key_ptr = GetVarint32Ptr(entry, entry + 5, &key_length);
     if (comparator_.comparator.user_comparator()->Compare(
             Slice(key_ptr, key_length - 8), key.user_key()) == 0) {
+      //确实是找到了等于此key的Node
       // Correct user key
       const uint64_t tag = DecodeFixed64(key_ptr + key_length - 8);
       switch (static_cast<ValueType>(tag & 0xff)) {

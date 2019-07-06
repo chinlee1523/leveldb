@@ -60,6 +60,7 @@ class SkipList {
   bool Contains(const Key& key) const;
 
   // Iteration over the contents of a skip list
+  //用于跳表的迭代器
   class Iterator {
    public:
     // Initialize an iterator over the specified list.

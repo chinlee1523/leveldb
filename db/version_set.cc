@@ -341,6 +341,7 @@ Status Version::Get(const ReadOptions& options, const LookupKey& k,
   std::vector<FileMetaData*> tmp;
   FileMetaData* tmp2;
   for (int level = 0; level < config::kNumLevels; level++) {
+    //一层层地查找
     size_t num_files = files_[level].size();
     if (num_files == 0) continue;
 
