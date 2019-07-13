@@ -528,6 +528,7 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
   // should not be added to the manifest.
   int level = 0;
   if (s.ok() && meta.file_size > 0) {
+    //写入文件成功，更新manifest文件
     const Slice min_user_key = meta.smallest.user_key();
     const Slice max_user_key = meta.largest.user_key();
     if (base != nullptr) {
@@ -538,12 +539,13 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
   }
 
   CompactionStats stats;
+  //记录一下操作时间
   stats.micros = env_->NowMicros() - start_micros;
   stats.bytes_written = meta.file_size;
   stats_[level].Add(stats);
   return s;
 }
-
+//imm_
 void DBImpl::CompactMemTable() {
   mutex_.AssertHeld();
   assert(imm_ != nullptr);
@@ -552,6 +554,7 @@ void DBImpl::CompactMemTable() {
   VersionEdit edit;
   Version* base = versions_->current();
   base->Ref();
+  //把imm_中的数据写到level 0中
   Status s = WriteLevel0Table(imm_, &edit, base);
   base->Unref();
 
@@ -660,13 +663,16 @@ void DBImpl::RecordBackgroundError(const Status& s) {
 void DBImpl::MaybeScheduleCompaction() {
   mutex_.AssertHeld();
   if (background_compaction_scheduled_) {
+    //已经开始压缩了
     // Already scheduled
   } else if (shutting_down_.load(std::memory_order_acquire)) {
     // DB is being deleted; no more background compactions
   } else if (!bg_error_.ok()) {
+    //压缩出现问题
     // Already got an error; no more changes
   } else if (imm_ == nullptr && manual_compaction_ == nullptr &&
              !versions_->NeedsCompaction()) {
+    //不需要压缩
     // No work to be done
   } else {
     background_compaction_scheduled_ = true;
@@ -686,6 +692,7 @@ void DBImpl::BackgroundCall() {
   } else if (!bg_error_.ok()) {
     // No more background work after a background error.
   } else {
+    //开始压缩
     BackgroundCompaction();
   }
 
@@ -701,6 +708,7 @@ void DBImpl::BackgroundCompaction() {
   mutex_.AssertHeld();
 
   if (imm_ != nullptr) {
+    //压缩imm_
     CompactMemTable();
     return;
   }
@@ -1379,7 +1387,7 @@ Status DBImpl::MakeRoomForWrite(bool force) {
       // this delay hands over some CPU to the compaction thread in
       // case it is sharing the same core as the writer.
       mutex_.Unlock();
-      //延迟1ms
+      //延迟1ms，让压缩线程来工作
       env_->SleepForMicroseconds(1000);
       //下次不能再延迟了
       allow_delay = false;  // Do not delay a single write more than once
@@ -1408,6 +1416,7 @@ Status DBImpl::MakeRoomForWrite(bool force) {
       s = env_->NewWritableFile(LogFileName(dbname_, new_log_number), &lfile);
       if (!s.ok()) {
         // Avoid chewing through file number space in a tight loop.
+        //file number减回去
         versions_->ReuseFileNumber(new_log_number);
         break;
       }
@@ -1421,6 +1430,7 @@ Status DBImpl::MakeRoomForWrite(bool force) {
       mem_ = new MemTable(internal_comparator_);
       mem_->Ref();
       force = false;  // Do not force another compaction if have room
+      //可能再进行一次压缩
       MaybeScheduleCompaction();
     }
   }
@@ -1544,6 +1554,7 @@ Status DB::Open(const Options& options, const std::string& dbname, DB** dbptr) {
   VersionEdit edit;
   // Recover handles create_if_missing, error_if_exists
   bool save_manifest = false;
+  //从日志中恢复文件
   Status s = impl->Recover(&edit, &save_manifest);
   if (s.ok() && impl->mem_ == nullptr) {
     //DB创建成功
